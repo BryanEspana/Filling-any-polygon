@@ -1,86 +1,190 @@
-mod colors;
 mod framebuffer;
+mod bmp;
+mod color;
+mod line;
 
 use framebuffer::FrameBuffer;
-use colors::Color;
+use color::Color;
+use line::draw_line;
 
-fn main() {
-    let width = 500;
-    let height = 500;
-    let mut fb = FrameBuffer::new(width, height);
+// Agregar esta función para rellenar el polígono
+fn fill_polygon(fb: &mut FrameBuffer, points: &[(i32, i32)], color: &Color) {
+    let mut nodes = Vec::new();
+    let mut min_y = points[0].1;
+    let mut max_y = points[0].1;
 
-    let poligon_1 = vec![
-        (165, 380), (185, 360), (180, 330), (207, 345),
-        (233, 330), (230, 360), (250, 380), (220, 385),
-        (205, 410), (193, 383),
-    ];
-
-    let poligon_2 = vec![
-        (321, 335), (288, 286), (339, 251), (374, 302)
-    ];
-
-    let poligon_3 = vec![
-    (377, 249), (411, 197), (436, 249)
-];
-
-    // Draw the polygon
-    for i in 0..poligon_1.len() {
-        let (x1, y1) = poligon_1[i];
-        let (x2, y2) = if i == poligon_1.len() - 1 {
-            poligon_1[0]
-        } else {
-            poligon_1[i + 1]
-        };
-        draw_line(&mut fb, x1, y1, x2, y2, Color::white());
+    // Encuentra el mínimo y el máximo de Y
+    for point in points {
+        if point.1 < min_y {
+            min_y = point.1;
+        }
+        if point.1 > max_y {
+            max_y = point.1;
+        }
     }
 
-    for i in 0..poligon_2.len(){
-        let(x1,y1) = poligon_2[i];
-        let (x2,y2) = if i == poligon_2.len() - 1 {
-            poligon_2[0]
-        } else {
-            poligon_2[i + 1]
-        };
-        draw_line(&mut fb, x1, y1, x2, y2, Color::white());
-    }
+    // Escanear línea por línea desde min_y hasta max_y
+    for y in min_y..=max_y {
+        nodes.clear();
 
-     // Dibuja el tercer polígono
-     for i in 0..poligon_3.len() {
-        let (x1, y1) = poligon_3[i];
-        let (x2, y2) = if i == poligon_3.len() - 1 {
-            poligon_3[0]
-        } else {
-            poligon_3[i + 1]
-        };
-        draw_line(&mut fb, x1, y1, x2, y2, Color::white());
-    }
+        // Construir una lista de nodos
+        let mut j = points.len() - 1;
+        for i in 0..points.len() {
+            if (points[i].1 < y && points[j].1 >= y) || (points[j].1 < y && points[i].1 >= y) {
+                let x = points[i].0 + (y - points[i].1) * (points[j].0 - points[i].0) / (points[j].1 - points[i].1);
+                nodes.push(x);
+            }
+            j = i;
+        }
 
-    // Save to file
-    fb.save("out.bmp");
+        // Ordenar nodos
+        nodes.sort();
+
+        // Rellenar entre pares de nodos
+        for n in (0..nodes.len()).step_by(2) {
+            if n + 1 < nodes.len() {
+                for x in nodes[n]..=nodes[n + 1] {
+                    fb.set_pixel(x as usize, y as usize, color);
+                }
+            }
+        }
+    }
 }
 
-fn draw_line(fb: &mut FrameBuffer, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
-    let mut x = x0;
-    let mut y = y0;
-    let dx = (x1 - x0).abs();
-    let dy = -(y1 - y0).abs();
-    let sx = if x0 < x1 { 1 } else { -1 };
-    let sy = if y0 < y1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    loop {
-        fb.draw_pixel(x as isize, y as isize, color);
-        if x == x1 && y == y1 { break; }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            if x == x1 { break; }
-            err += dy;
-            x += sx;
+fn point_in_polygon(point: (i32, i32), polygon: &[(i32, i32)]) -> bool {
+    let (x, y) = point;
+    let mut inside = false;
+    let mut j = polygon.len() - 1;
+    for i in 0..polygon.len() {
+        let (xi, yi) = polygon[i];
+        let (xj, yj) = polygon[j];
+        if ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
+            inside = !inside;
         }
-        if e2 <= dx {
-            if y == y1 { break; }
-            err += dx;
-            y += sy;
+        j = i;
+    }
+    inside
+}
+
+fn fill_polygon_with_hole(fb: &mut FrameBuffer, outer: &[(i32, i32)], hole: &[(i32, i32)], color: &Color) {
+    let mut nodes = Vec::new();
+    let mut min_y = outer[0].1;
+    let mut max_y = outer[0].1;
+
+    // Encuentra el mínimo y el máximo de Y
+    for point in outer {
+        if point.1 < min_y {
+            min_y = point.1;
+        }
+        if point.1 > max_y {
+            max_y = point.1;
         }
     }
+
+    // Escanear línea por línea desde min_y hasta max_y
+    for y in min_y..=max_y {
+        nodes.clear();
+
+        // Construir una lista de nodos
+        let mut j = outer.len() - 1;
+        for i in 0..outer.len() {
+            if (outer[i].1 < y && outer[j].1 >= y) || (outer[j].1 < y && outer[i].1 >= y) {
+                let x = outer[i].0 + (y - outer[i].1) * (outer[j].0 - outer[i].0) / (outer[j].1 - outer[i].1);
+                nodes.push(x);
+            }
+            j = i;
+        }
+
+        // Ordenar nodos
+        nodes.sort();
+
+        // Rellenar entre pares de nodos
+        for n in (0..nodes.len()).step_by(2) {
+            if n + 1 < nodes.len() {
+                for x in nodes[n]..=nodes[n + 1] {
+                    if !point_in_polygon((x, y), hole) {
+                        fb.set_pixel(x as usize, y as usize, color);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+fn main() {
+    let mut fb = FrameBuffer::new(800, 600);
+
+    let points1 = [
+        (165, 380), (185, 360), (180, 330), (207, 345), (233, 330),
+        (230, 360), (250, 380), (220, 385), (205, 410), (193, 383),
+    ];
+
+    let points2 = [
+        (321, 335), (288, 286), (339, 251), (374, 302),
+    ];
+
+    let points3 = [
+        (377, 249), (411, 197), (436, 249),
+    ];
+
+    let points4 = [
+        (413, 177), (448, 159), (502, 88), (553, 53), (535, 36),
+        (676, 37), (660, 52), (750, 145), (761, 179), (672, 192),
+        (659, 214), (615, 214), (632, 230), (580, 230),
+        (597, 215), (552, 214), (517, 144), (466, 180),
+    ];
+
+    let points5 = [
+        (682, 175), (708, 120), (735, 148), (739, 170),
+    ];
+
+    // Rellenar el primer polígono con color amarillo
+    fill_polygon(&mut fb, &points1, &Color::YELLOW);
+
+    // Dibujar la orilla del primer polígono con color blanco
+    for i in 0..points1.len() {
+        let (x0, y0) = points1[i];
+        let (x1, y1) = points1[(i + 1) % points1.len()];
+        draw_line(&mut fb, x0, y0, x1, y1, &Color::WHITE);
+    }
+
+    // Rellenar el segundo polígono con color azul
+    fill_polygon(&mut fb, &points2, &Color::BLUE);
+
+    // Dibujar la orilla del segundo polígono con color blanco
+    for i in 0..points2.len() {
+        let (x0, y0) = points2[i];
+        let (x1, y1) = points2[(i + 1) % points2.len()];
+        draw_line(&mut fb, x0, y0, x1, y1, &Color::WHITE);
+    }
+
+    // Rellenar el tercer polígono con color rojo
+    fill_polygon(&mut fb, &points3, &Color::RED);
+
+    // Dibujar la orilla del tercer polígono con color blanco
+    for i in 0..points3.len() {
+        let (x0, y0) = points3[i];
+        let (x1, y1) = points3[(i + 1) % points3.len()];
+        draw_line(&mut fb, x0, y0, x1, y1, &Color::WHITE);
+    }
+
+    // Rellenar el cuarto polígono con color verde
+    fill_polygon_with_hole(&mut fb, &points4, &points5, &Color::GREEN);
+
+    // Dibujar la orilla del cuarto polígono con color blanco
+    for i in 0..points4.len() {
+        let (x0, y0) = points4[i];
+        let (x1, y1) = points4[(i + 1) % points4.len()];
+        draw_line(&mut fb, x0, y0, x1, y1, &Color::WHITE);
+    }
+
+    // Dibujar la orilla del agujero con color blanco
+    for i in 0..points5.len() {
+        let (x0, y0) = points5[i];
+        let (x1, y1) = points5[(i + 1) % points5.len()];
+        draw_line(&mut fb, x0, y0, x1, y1, &Color::WHITE);
+    }
+
+    fb.save_as_bmp("out.bmp");
 }
