@@ -9,20 +9,33 @@ fn main() {
     let height = 500;
     let mut fb = FrameBuffer::new(width, height);
 
-    let polygon_points = vec![
+    let poligon_1 = vec![
         (165, 380), (185, 360), (180, 330), (207, 345),
         (233, 330), (230, 360), (250, 380), (220, 385),
         (205, 410), (193, 383),
     ];
-    
+
+    let poligon_2 = vec![
+        (321, 335), (288, 286), (339, 251), (374, 302)
+    ];
 
     // Draw the polygon
-    for i in 0..polygon_points.len() {
-        let (x1, y1) = polygon_points[i];
-        let (x2, y2) = if i == polygon_points.len() - 1 {
-            polygon_points[0]
+    for i in 0..poligon_1.len() {
+        let (x1, y1) = poligon_1[i];
+        let (x2, y2) = if i == poligon_1.len() - 1 {
+            poligon_1[0]
         } else {
-            polygon_points[i + 1]
+            poligon_1[i + 1]
+        };
+        draw_line(&mut fb, x1, y1, x2, y2, Color::white());
+    }
+
+    for i in 0..poligon_2.len(){
+        let(x1,y1) = poligon_2[i];
+        let (x2,y2) = if i == poligon_2.len() - 1 {
+            poligon_2[0]
+        } else {
+            poligon_2[i + 1]
         };
         draw_line(&mut fb, x1, y1, x2, y2, Color::white());
     }
