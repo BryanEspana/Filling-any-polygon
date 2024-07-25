@@ -19,6 +19,10 @@ fn main() {
         (321, 335), (288, 286), (339, 251), (374, 302)
     ];
 
+    let poligon_3 = vec![
+    (377, 249), (411, 197), (436, 249)
+];
+
     // Draw the polygon
     for i in 0..poligon_1.len() {
         let (x1, y1) = poligon_1[i];
@@ -36,6 +40,17 @@ fn main() {
             poligon_2[0]
         } else {
             poligon_2[i + 1]
+        };
+        draw_line(&mut fb, x1, y1, x2, y2, Color::white());
+    }
+
+     // Dibuja el tercer polígono
+     for i in 0..poligon_3.len() {
+        let (x1, y1) = poligon_3[i];
+        let (x2, y2) = if i == poligon_3.len() - 1 {
+            poligon_3[0]
+        } else {
+            poligon_3[i + 1]
         };
         draw_line(&mut fb, x1, y1, x2, y2, Color::white());
     }
